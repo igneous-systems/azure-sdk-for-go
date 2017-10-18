@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"encoding/json"
 	"encoding/xml"
 	"errors"
 	"fmt"
@@ -103,6 +104,7 @@ type BlobProperties struct {
 	LeaseDuration         string      `xml:"LeaseDuration"`
 	ServerEncrypted       bool        `xml:"ServerEncrypted"`
 	IncrementalCopy       bool        `xml:"IncrementalCopy"`
+	BlobTier              BlobTier    `xml:"BlobTier" header:"x-ms-access-tier"`
 }
 
 // BlobType defines the type of the Azure Blob.
@@ -113,6 +115,16 @@ const (
 	BlobTypeBlock  BlobType = "BlockBlob"
 	BlobTypePage   BlobType = "PageBlob"
 	BlobTypeAppend BlobType = "AppendBlob"
+)
+
+// BlobType defines the type of the Azure Blob.
+type BlobTier string
+
+// Types of page blobs
+const (
+	BlobTierHot     BlobTier = "Hot"
+	BlobTierCool    BlobTier = "Cool"
+	BlobTierArchive BlobTier = "Archive"
 )
 
 func (b *Blob) buildPath() string {
@@ -623,4 +635,32 @@ func pathForResource(container, name string) string {
 		return fmt.Sprintf("/%s/%s", container, name)
 	}
 	return fmt.Sprintf("/%s", container)
+}
+
+// See https://docs.microsoft.com/en-us/rest/api/storageservices/fileservices/Put-Blob
+func (b *Blob) SetBlobTier(tier BlobTier) error {
+	params := url.Values{"comp": {"tier"}}
+	params := url.Values{}
+	headers := b.Container.bsc.client.getStandardHeaders()
+	headers["x-ms-access-tier"] = string(tier)
+
+	headers["Content-Length"] = "0"
+
+	headers = mergeHeaders(headers, headersFromStruct(b.Properties))
+	headers = b.Container.bsc.client.addMetadataToHeaders(headers, b.Metadata)
+	buf, err := json.MarshalIndent(headers, "", "  ")
+	if err != nil {
+		fmt.Println("error:", err)
+	}
+	fmt.Print(string(buf))
+
+	params = addTimeout(params, options.Timeout)
+	uri := b.Container.bsc.client.getEndpoint(blobServiceName, b.buildPath(), params)
+
+	resp, err := b.Container.bsc.client.exec(http.MethodPut, uri, headers, nil, b.Container.bsc.auth)
+	if err != nil {
+		return err
+	}
+	readAndCloseBody(resp.body)
+	return checkRespCode(resp.statusCode, []int{http.StatusCreated})
 }
