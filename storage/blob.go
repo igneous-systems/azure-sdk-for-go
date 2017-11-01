@@ -105,6 +105,7 @@ type BlobProperties struct {
 	ServerEncrypted       bool        `xml:"ServerEncrypted"`
 	IncrementalCopy       bool        `xml:"IncrementalCopy"`
 	BlobTier              BlobTier    `xml:"BlobTier" header:"x-ms-access-tier"`
+	ArchiveStatus         string      `xml:"ArchiveStatus"`
 }
 
 // BlobType defines the type of the Azure Blob.
@@ -336,6 +337,7 @@ func (b *Blob) GetProperties(options *GetBlobPropertiesOptions) error {
 	if err != nil {
 		return err
 	}
+
 	defer readAndCloseBody(resp.body)
 
 	if err = checkRespCode(resp.statusCode, []int{http.StatusOK}); err != nil {
@@ -397,6 +399,7 @@ func (b *Blob) writeProperties(h http.Header, includeContentLen bool) error {
 		BlobType:              BlobType(h.Get("x-ms-blob-type")),
 		LeaseStatus:           h.Get("x-ms-lease-status"),
 		LeaseState:            h.Get("x-ms-lease-state"),
+		ArchiveStatus:         h.Get("x-ms-archive-status"),
 	}
 	b.writeMetadata(h)
 	return nil
@@ -640,9 +643,7 @@ func pathForResource(container, name string) string {
 // See https://docs.microsoft.com/en-us/rest/api/storageservices/fileservices/Put-Blob
 func (b *Blob) SetBlobTier(tier BlobTier) error {
 	params := url.Values{"comp": {"tier"}}
-	params := url.Values{}
 	headers := b.Container.bsc.client.getStandardHeaders()
-	headers["x-ms-access-tier"] = string(tier)
 
 	headers["Content-Length"] = "0"
 
@@ -654,7 +655,6 @@ func (b *Blob) SetBlobTier(tier BlobTier) error {
 	}
 	fmt.Print(string(buf))
 
-	params = addTimeout(params, options.Timeout)
 	uri := b.Container.bsc.client.getEndpoint(blobServiceName, b.buildPath(), params)
 
 	resp, err := b.Container.bsc.client.exec(http.MethodPut, uri, headers, nil, b.Container.bsc.auth)
@@ -662,5 +662,6 @@ func (b *Blob) SetBlobTier(tier BlobTier) error {
 		return err
 	}
 	readAndCloseBody(resp.body)
-	return checkRespCode(resp.statusCode, []int{http.StatusCreated})
+
+	return checkRespCode(resp.statusCode, []int{http.StatusOK, http.StatusAccepted})
 }
