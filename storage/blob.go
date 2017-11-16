@@ -1,7 +1,6 @@
 package storage
 
 import (
-	"encoding/json"
 	"encoding/xml"
 	"errors"
 	"fmt"
@@ -644,16 +643,12 @@ func pathForResource(container, name string) string {
 func (b *Blob) SetBlobTier(tier BlobTier) error {
 	params := url.Values{"comp": {"tier"}}
 	headers := b.Container.bsc.client.getStandardHeaders()
+	headers["x-ms-access-tier"] = string(tier)
 
 	headers["Content-Length"] = "0"
 
 	headers = mergeHeaders(headers, headersFromStruct(b.Properties))
 	headers = b.Container.bsc.client.addMetadataToHeaders(headers, b.Metadata)
-	buf, err := json.MarshalIndent(headers, "", "  ")
-	if err != nil {
-		fmt.Println("error:", err)
-	}
-	fmt.Print(string(buf))
 
 	uri := b.Container.bsc.client.getEndpoint(blobServiceName, b.buildPath(), params)
 
