@@ -399,6 +399,7 @@ func (b *Blob) writeProperties(h http.Header, includeContentLen bool) error {
 		LeaseStatus:           h.Get("x-ms-lease-status"),
 		LeaseState:            h.Get("x-ms-lease-state"),
 		ArchiveStatus:         h.Get("x-ms-archive-status"),
+		BlobTier:              BlobTier(h.Get("x-ms-access-tier")),
 	}
 	b.writeMetadata(h)
 	return nil
