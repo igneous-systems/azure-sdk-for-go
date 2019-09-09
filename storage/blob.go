@@ -644,12 +644,13 @@ func pathForResource(container, name string) string {
 func (b *Blob) SetBlobTier(tier BlobTier) error {
 	params := url.Values{"comp": {"tier"}}
 	headers := b.Container.bsc.client.getStandardHeaders()
-	headers["x-ms-access-tier"] = string(tier)
 
 	headers["Content-Length"] = "0"
-
 	headers = mergeHeaders(headers, headersFromStruct(b.Properties))
 	headers = b.Container.bsc.client.addMetadataToHeaders(headers, b.Metadata)
+
+	// update tier after 'mergeHeaders'
+	headers["x-ms-access-tier"] = string(tier)
 
 	uri := b.Container.bsc.client.getEndpoint(blobServiceName, b.buildPath(), params)
 
